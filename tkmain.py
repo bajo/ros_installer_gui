@@ -13,6 +13,7 @@ __email__ = 'markus.bajones@gmail.com'
 """
 
 import ImageTk
+import lsb_release
 import Tkinter as tk
 import ttk as ttk
 import subprocess
@@ -62,7 +63,9 @@ class ROSInstallerGUI:
         label.image = photoimage
         label.pack(fill=tk.X)
 
-        self.settings_button = tk.Button(master, text="Customize settings", command=self.show_settings)
+        self.message_settings = tk.StringVar()
+        self.message_settings.set('Customize settings')
+        self.settings_button = tk.Button(master, textvar=self.message_settings, command=self.show_settings)
         self.settings_button.pack(fill=tk.X)
 
         self.message = tk.StringVar()
@@ -78,44 +81,46 @@ class ROSInstallerGUI:
 
 
     def show_settings(self):
-        self.newWindow = tk.Toplevel(self.master)
-        self.newWindow.title("Settings")
+        newWindow = tk.Toplevel(self.master)
+        newWindow.title("Settings")
 
-        self.notebook = ttk.Notebook(self.newWindow)
-        self.tab1 = ttk.Frame(self.notebook)
-        self.tab2 = ttk.Frame(self.notebook)
-        self.tab3 = ttk.Frame(self.notebook)
-        self.tab4 = ttk.Frame(self.notebook)
-        self.notebook.add(self.tab1, text='ROS version and packages')
-        self.notebook.add(self.tab2, text='ROS version')
-        self.notebook.add(self.tab3, text='Shell')
-        self.notebook.add(self.tab4, text='Mirrors')
-        self.notebook.pack(fill=tk.X)
+        notebook = ttk.Notebook(newWindow)
+        tab1 = ttk.Frame(notebook)
+        tab2 = ttk.Frame(notebook)
+        tab3 = ttk.Frame(notebook)
+        tab4 = ttk.Frame(notebook)
+        notebook.add(tab1, text='ROS version and packages')
+        notebook.add(tab2, text='ROS version')
+        notebook.add(tab3, text='Shell')
+        notebook.add(tab4, text='Mirrors')
+        notebook.pack(fill=tk.X)
 
         for text, pkg in self.packages:
-            b = tk.Radiobutton(self.tab1, text=text, variable=self.select_pkg, value=pkg)
+            b = tk.Radiobutton(tab1, text=text, variable=self.select_pkg, value=pkg)
             b.pack(anchor=tk.W)
-        b = tk.Checkbutton(self.tab1, text="Include catkin tools?", variable=self.select_catkin)
+        b = tk.Checkbutton(tab1, text="Include catkin tools?", variable=self.select_catkin)
         b.pack(anchor=tk.W)
 
         for text in self.ros_version:
-            b = tk.Radiobutton(self.tab2, text=text, variable=self.select_ros_version, value=text)
+            b = tk.Radiobutton(tab2, text=text, variable=self.select_ros_version, value=text)
             b.pack(anchor=tk.W)
 
         for text in self.shell:
-            b = tk.Radiobutton(self.tab3, text=text, variable=self.select_shell, value=text)
+            b = tk.Radiobutton(tab3, text=text, variable=self.select_shell, value=text)
             b.pack(anchor=tk.W)
 
         for text, mirror in self.mirrors:
-            b = tk.Radiobutton(self.tab4, text=text, variable=self.select_mirror, value=mirror)
+            b = tk.Radiobutton(tab4, text=text, variable=self.select_mirror, value=mirror)
             b.pack(anchor=tk.W)
 
-        button = tk.Button(self.newWindow, text ="Done", command = self.newWindow.destroy)
+        button = tk.Button(newWindow, text ="Done", command = newWindow.destroy)
         button.pack()
+        self.settings_button.config(bg='green')
+        self.master.update()
 
     def explain_next_steps(self):
-        self.newWindow = tk.Toplevel(self.master)
-        self.newWindow.title('Final steps')
+        newWindow = tk.Toplevel(self.master)
+        newWindow.title('Final steps')
 
         message = tk.StringVar()
         if self.installed and self.rosdep_update and self.shell_written:
@@ -124,17 +129,31 @@ class ROSInstallerGUI:
         else:
             message.set('Some step did not execute or had an error.\n\n'
                         'If you think this is fine you can proceed to create your catkin workspace.\n'
-                        'Otherwise check the output on the terminal for more information.')
-        label = tk.Label(self.newWindow, textvariable=message, anchor=tk.W, justify=tk.LEFT)
+                        'Otherwise check the output on the terminal for more information.\n')
+        label = tk.Label(newWindow, textvariable=message, anchor=tk.W, justify=tk.LEFT)
         label.pack()
-        button = tk.Button(self.newWindow, text ="Done", command = self.master.quit)
+        button = tk.Button(newWindow, text ="Done", command = self.master.quit)
         button.pack()
+
+    def check_ubuntu_ros(self):
+        data = {'indigo': ['13.10', '14.04'],
+                'jade': ['14.04', '14.10', '15.04']}
+        release = lsb_release.get_distro_information()['RELEASE']
+        if release in data[self.select_ros_version.get()]:
+            return True
+        return False
 
 
     def install_ros(self):
+        if not self.check_ubuntu_ros():
+            self.settings_button.config(bg='red')
+            self.message_settings.set('Check ROS version.')
+            self.master.update()
+            return
         self.message.set('Executing...')
         self.install_button.config(bg='green')
         self.master.update()
+
         mirror, ros_pkgs, ros_version = self.select_mirror.get(), self.select_pkg.get(), self.select_ros_version.get()
         ros_pkgs = '-'.join(['ros', ros_version, ros_pkgs])
         catkin =''
@@ -156,14 +175,13 @@ class ROSInstallerGUI:
     def update_rosdep(self):
         try:
             subprocess.check_call(['/usr/bin/rosdep', 'update'])
-
+            self.rosdep_update = True
         except CalledProcessError as e:
             print("rosdep executed with errors. [{err}]".format(err=str(e)))
             self.rosdep_update = False
 
     def write_shell_config(self):
         shell = self.select_shell.get()
-        print(shell)
         content = "".join(['source /opt/ros/', self.select_ros_version.get(), '/setup.', shell])
         file = os.path.join(os.environ['HOME'], "".join(['.',shell,'rc']))
         try:
