@@ -28,9 +28,6 @@ __version__ = '1.0.0'
 __email__ = 'markus.bajones@gmail.com'
 
 
-sources_list = '/etc/apt/sources.list.d/ros-latest.list'
-ros_key = '0xB01FA116'
-ros_keyserver = 'hkp://pool.sks-keyservers.net:80'
 
 def install_packages(pkgs):
     print("installing {pkgs}".format(pkgs=pkgs))
@@ -49,7 +46,7 @@ def install_packages(pkgs):
 
             cache.commit()
     except Exception as arg:
-        print >> sys.stderr, "Sorry, package installation failed [{err}]".format(err=str(arg))
+        print("Sorry, package installation failed [{err}]".format(err=str(arg)))
 
     return
 
@@ -61,27 +58,28 @@ def write_source_list(server, file):
     content = 'deb '+server+'/ros/ubuntu '+codename+' main'
 
     try:
-        if not content in open(file).read():
-            with open(file, 'w') as f:
+        if not os.path.exists(file) or not content in open(file).read():
+            with open(file, 'w+') as f:
                 f.write(content)
                 print("{file} written successfully.".format(file=file))
         else:
             print("Mirror already in {file}".format(file=file))
     except IOError as e:
-        print >> sys.stderr, "Sorry, unable to write file [{err}]".format(err=str(e))
+        print("Sorry, unable to write file [{err}]".format(err=str(e)))
     return True
 
 def add_key_to_system(keyserver, key):
+    print("add gpg key to system")
     try:
         subprocess.check_call(["/usr/bin/apt-key", "adv", "--keyserver", keyserver, "--recv-key", key])
-    except CalledProcessError as e:
-        print >> sys.stderr, "apt-key executed with errors. [{err}]".format(err=str(e))
+    except subprocess.CalledProcessError as e:
+        print("apt-key executed with errors. [{err}]".format(err=str(e)))
 
 def check_key_installed(key):
+    print("check if gpg key is installed")
     try:
         proc = subprocess.Popen(["/usr/bin/apt-key", "list"], stdout=subprocess.PIPE)
-        while True:
-            line = proc.stdout.readline()
+        for line in iter(proc.stdout.readline, ''):
             if key.split('0x')[1] in line: # remoce '0x' from the key as it is not shown in apt-key list output
                 print('{key} is already installed on this system.'.format(key=key))
                 return True
@@ -97,17 +95,19 @@ def init_rosdep():
     if not os.path.exists('/etc/ros/rosdep/sources.list.d/20-default.list'):
         try:
             subprocess.check_call(['/usr/bin/rosdep', 'init'])
-        except CalledProcessError as e:
-            print >> sys.stderr, "rosdep executed with errors. [{err}]".format(err=str(e))
+        except subprocess.CalledProcessError as e:
+            print("rosdep executed with errors. [{err}]".format(err=str(e)))
 
 if __name__ == '__main__':
     arguments = docopt(__doc__, version='ROS Installer root utils 0.1')
-
     ros_version = arguments['<ros_version>']
     packages = arguments['<packages>']
     server = arguments['<server>']
-    print >> sys.stderr, "parameters: [{}, {}, {}]".format(ros_version, server, packages)
+    print("parameters: [{}, {}, {}]".format(ros_version, server, packages))
 
+    sources_list = '/etc/apt/sources.list.d/ros-latest.list'
+    ros_key = '0xB01FA116'
+    ros_keyserver = 'hkp://pool.sks-keyservers.net:80'
 
     if not os.geteuid() == 0:
         sys.exit('Script must be run as root')
