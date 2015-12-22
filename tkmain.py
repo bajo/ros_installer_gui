@@ -162,11 +162,11 @@ class ROSInstallerGUI:
         print(mirror, ros_version, ros_pkgs, catkin)
 
         try:
-            subprocess.call(['gksudo', 'python root_tools.py', mirror, ros_version, ros_pkgs, catkin])
+            subprocess.call(['gksudo', 'python '+os.getcwd()+'/root_tools.py', mirror, ros_version, ros_pkgs, catkin])
             self.message.set('Done')
             self.update_rosdep()
             self.installed = True
-        except CalledProcessError as e:
+        except subprocess.CalledProcessError as e:
             self.message.set('Something went wrong. Please check the terminal output')
             self.install_button.config(bg='red')
             self.installed = False
@@ -176,7 +176,7 @@ class ROSInstallerGUI:
         try:
             subprocess.check_call(['/usr/bin/rosdep', 'update'])
             self.rosdep_update = True
-        except CalledProcessError as e:
+        except subprocess.CalledProcessError as e:
             print("rosdep executed with errors. [{err}]".format(err=str(e)))
             self.rosdep_update = False
 
@@ -187,7 +187,7 @@ class ROSInstallerGUI:
         try:
             if not os.path.exists(file) or not content in open(file).read():
                 with open(file, 'a+') as f:
-                    #f.write(content+'\n')
+                    f.write(content+'\n')
                     print("{file} written successfully.".format(file=file))
             else:
                 print("'{}' already in {}".format(content, file))
