@@ -162,7 +162,7 @@ class ROSInstallerGUI:
         print(mirror, ros_version, ros_pkgs, catkin)
 
         try:
-            subprocess.call(['gksudo', 'python '+os.getcwd()+'/root_tools.py', mirror, ros_version, ros_pkgs, catkin])
+            subprocess.call(['pkexec', os.getcwd()+'/root_tools.py', mirror, ros_version, ros_pkgs, catkin])
             self.message.set('Done')
             self.update_rosdep()
             self.installed = True
